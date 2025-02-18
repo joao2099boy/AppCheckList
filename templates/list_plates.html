@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista de Placas</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>Placas Enviadas</h1>
+  {% if checklists %}
+    <ul>
+      {% for checklist in checklists %}
+        <li>
+          <strong>Placa:</strong> {{ checklist.plate_number }} 
+          - <strong>Tipo de Veículo:</strong> {{ checklist.vehicle_type }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Nenhuma placa encontrada.</p>
+  {% endif %}
+</body>
+</html>

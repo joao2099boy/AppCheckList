@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist Offline</title>
+    <script>
+        // Função para salvar dados no IndexedDB
+        function saveToIndexedDB(data) {
+            let request = indexedDB.open("ChecklistDB", 1);
+
+            request.onupgradeneeded = function (event) {
+                let db = event.target.result;
+                if (!db.objectStoreNames.contains("checklists")) {
+                    db.createObjectStore("checklists", { keyPath: "id", autoIncrement: true });
+                }
+            };
+
+            request.onsuccess = function (event) {
+                let db = event.target.result;
+                let transaction = db.transaction(["checklists"], "readwrite");
+                let store = transaction.objectStore("checklists");
+                store.add(data);
+            };
+        }
+
+        // Função para sincronizar com o servidor
+        async function syncWithServer() {
+            let request = indexedDB.open("ChecklistDB", 1);
+
+            request.onsuccess = function (event) {
+                let db = event.target.result;
+                let transaction = db.transaction(["checklists"], "readonly");
+                let store = transaction.objectStore("checklists");
+
+                let getAllRequest = store.getAll();
+                getAllRequest.onsuccess = async function () {
+                    let checklists = getAllRequest.result;
+
+                    for (let checklist of checklists) {
+                        // Enviar cada checklist para o servidor
+                        await fetch("/sync", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(checklist),
+                        });
+
+                        // Remover checklist sincronizado do IndexedDB
+                        let deleteTransaction = db.transaction(["checklists"], "readwrite");
+                        let deleteStore = deleteTransaction.objectStore("checklists");
+                        deleteStore.delete(checklist.id);
+                    }
+                };
+            };
+        }
+
+        // Monitorar quando a conexão com a internet estiver disponível
+        window.addEventListener("online", syncWithServer);
+        
+        // Exemplo de como salvar um dado no IndexedDB (suponha que seja um checklist)
+        document.addEventListener("DOMContentLoaded", function() {
+            const checklistData = {
+                vehicle_type: "Ônibus",
+                plate_number: "ABC-1234",
+                items_checked: ["Óleo", "Pneus", "Faróis"],
+            };
+            saveToIndexedDB(checklistData);
+        });
+    </script>
+</head>
+<body>
+    <h1>Checklist Offline</h1>
+    <p>Os dados serão salvos localmente e sincronizados com o servidor quando a conexão for restabelecida.</p>
+</body>
+</html>

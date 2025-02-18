@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline Form</title>
+  <script>
+    const DB_NAME = 'ChecklistDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'checklists';
+
+    let db;
+
+    // Inicializa IndexedDB
+    function initializeIndexedDB() {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+
+      request.onsuccess = (event) => {
+        db = event.target.result;
+        console.log('IndexedDB inicializado com sucesso.');
+        if (navigator.onLine) {
+          syncLocalData(); // Sincroniza os dados salvos localmente ao carregar a página
+        }
+      };
+
+      request.onerror = (event) => {
+        console.error('Erro ao abrir IndexedDB:', event.target.errorCode);
+      };
+    }
+
+    // Salvar dados no IndexedDB
+    function saveToIndexedDB(data) {
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.add(data);
+
+      request.onsuccess = () => {
+        console.log('Dados salvos localmente no IndexedDB.');
+        alert('Você está offline. Os dados foram salvos localmente.');
+      };
+
+      request.onerror = (event) => {
+        console.error('Erro ao salvar no IndexedDB:', event.target.errorCode);
+      };
+    }
+
+    // Sincronizar dados salvos localmente com o servidor
+    function syncLocalData() {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const data = request.result;
+
+        if (data.length === 0) {
+          console.log('Nenhum dado local para sincronizar.');
+          return;
+        }
+
+        console.log('Dados locais encontrados. Tentando sincronizar...');
+
+        data.forEach((item) => {
+          fetch('/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(item),
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(`Erro do servidor: ${response.statusText}`);
+              }
+              return response.json();
+            })
+            .then(() => {
+              // Exibe o alert informando a placa sincronizada
+              alert(`Placa ${item.plate_number} sincronizada com sucesso!`);
+              // Remove o dado do IndexedDB após sincronização
+              deleteFromIndexedDB(item.id);
+            })
+            .catch((error) => {
+              console.error('Erro ao sincronizar dados locais:', error);
+            });
+        });
+      };
+
+      request.onerror = (event) => {
+        console.error('Erro ao acessar os dados locais:', event.target.errorCode);
+      };
+    }
+
+    // Remover dado do IndexedDB
+    function deleteFromIndexedDB(id) {
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.delete(id);
+
+      request.onsuccess = () => {
+        console.log(`Dado com ID ${id} removido do IndexedDB.`);
+      };
+
+      request.onerror = (event) => {
+        console.error('Erro ao remover dado do IndexedDB:', event.target.errorCode);
+      };
+    }
+
+    // Submeter o formulário
+    function submitForm(event) {
+      event.preventDefault();
+
+      const vehicleType = document.getElementById('vehicle_type').value;
+      const plateNumber = document.getElementById('plate_number').value;
+      const itemsChecked = Array.from(document.querySelectorAll('input[name="items_checked"]:checked')).map(
+        (input) => input.value
+      );
+
+      const data = {
+        vehicle_type: vehicleType,
+        plate_number: plateNumber,
+        items_checked: itemsChecked,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (navigator.onLine) {
+        fetch('/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`Erro do servidor: ${response.statusText}`);
+            }
+            return response.json();
+          })
+          .then(() => {
+            alert('Dados sincronizados com sucesso!');
+          })
+          .catch((error) => {
+            console.error('Erro ao sincronizar:', error);
+            alert('Erro ao sincronizar com o servidor. Salvando os dados localmente.');
+            saveToIndexedDB(data);
+          });
+      } else {
+        saveToIndexedDB(data);
+      }
+    }
+
+    // Inicializar ao carregar a página
+    window.onload = () => {
+      initializeIndexedDB();
+
+      // Monitorar mudanças de conectividade
+      window.addEventListener('online', () => {
+        console.log('Conexão restaurada. Tentando sincronizar dados locais...');
+        syncLocalData();
+      });
+
+      window.addEventListener('offline', () => {
+        console.log('Sem conexão. Salvando dados localmente.');
+      });
+    };
+  </script>
+</head>
+<body>
+  <h1>Offline Form</h1>
+  <form onsubmit="submitForm(event)">
+    <label for="vehicle_type">Tipo de Veículo:</label>
+    <input type="text" id="vehicle_type" name="vehicle_type" required><br><br>
+
+    <label for="plate_number">Número da Placa:</label>
+    <input type="text" id="plate_number" name="plate_number" required><br><br>
+
+    <label>Itens Verificados:</label><br>
+    <input type="checkbox" id="item1" name="items_checked" value="Item 1">
+    <label for="item1">Item 1</label><br>
+    <input type="checkbox" id="item2" name="items_checked" value="Item 2">
+    <label for="item2">Item 2</label><br>
+    <input type="checkbox" id="item3" name="items_checked" value="Item 3">
+    <label for="item3">Item 3</label><br><br>
+
+    <button type="submit">Salvar</button>
+  </form>
+</body>
+</html>

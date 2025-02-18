@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checklist - Online</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>Checklist Online</h1>
+  <form action="/submit" method="POST">
+    <label for="vehicle">Placa do Veículo:</label>
+    <input type="text" id="vehicle" name="vehicle" required>
+    
+    <label for="driver">Nome do Motorista:</label>
+    <input type="text" id="driver" name="driver" required>
+
+    <label for="lights">Luzes funcionando:</label>
+    <select id="lights" name="lights" required>
+      <option value="yes">Sim</option>
+      <option value="no">Não</option>
+    </select>
+
+    <label for="tires">Pneus em boas condições:</label>
+    <select id="tires" name="tires" required>
+      <option value="yes">Sim</option>
+      <option value="no">Não</option>
+    </select>
+
+    <label for="brakes">Freios funcionando:</label>
+    <select id="brakes" name="brakes" required>
+      <option value="yes">Sim</option>
+      <option value="no">Não</option>
+    </select>
+
+    <button type="submit">Enviar</button>
+  </form>
+</body>
+</html>
